@@ -1,4 +1,4 @@
-# 22 May _2025 Update
+# 22 May _2025 Update => https://icgveteran.onrender.com
 import streamlit as st
 from streamlit_option_menu import option_menu
 import sqlite3  # Changed from mysql.connector
@@ -569,14 +569,12 @@ def login_form():
     with st.sidebar:
         col1,col2,col3 = st.columns(3)
         with col2:
-            st.image("C:/clak/_deployment/veteran/icgvwa_logo.jpg",width=150)
-         
-        st.markdown("""
-        <div class="logo">
-            <h1>ICGVWA WELCOMES</h1>
-        </div>
-        """, unsafe_allow_html=True)
-    
+           st.markdown("""
+            <div class="logo">
+            <h1>ICGVWA APP</h1>
+            </div>
+            """, unsafe_allow_html=True)
+
     col1, col2, col3 = st.columns([1,2,1])
     with col2:
         with st.container():
