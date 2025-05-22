@@ -1,3 +1,4 @@
+
 # 22 May _2025 Update => https://icgveteran.onrender.com
 import streamlit as st
 from streamlit_option_menu import option_menu
@@ -173,6 +174,14 @@ def inject_custom_css():
                 padding: 15px;
             }
         }
+        
+        /* Delete button styling */
+        .delete-btn {
+            background-color: #ef4444 !important;
+        }
+        .delete-btn:hover {
+            background-color: #dc2626 !important;
+        }
     </style>
     """, unsafe_allow_html=True)
 
@@ -325,9 +334,6 @@ try:
                 )
             """))
             
-            # Create Master_Veteran_View as a virtual table (SQLite doesn't support views like MySQL)
-            # We'll handle this in the code when needed
-            
             conn.commit()
     
     initialize_database()
@@ -479,7 +485,33 @@ def create_user(username: str, password: str, email: str, role: str, state: str 
         st.error(f"Error creating user: {str(e)}")
         return False
 
-# ---------------------------------------------------------------------
+def delete_record(table_name: str, record_id: int) -> bool:
+    """Delete a record from specified table"""
+    try:
+        with Session() as session:
+            # First check if table exists
+            tables = session.execute(text("SELECT name FROM sqlite_master WHERE type='table'")).fetchall()
+            tables = [t[0] for t in tables]
+            
+            if table_name not in tables:
+                st.error(f"Table {table_name} does not exist")
+                return False
+                
+            # Get primary key column name
+            pk_column = session.execute(text(f"PRAGMA table_info({table_name})")).fetchall()
+            pk_column = [col[1] for col in pk_column if col[5] == 1][0]  # Column 5 is pk flag
+            
+            # Delete the record
+            session.execute(
+                text(f"DELETE FROM {table_name} WHERE {pk_column} = :id"),
+                {'id': record_id}
+            )
+            session.commit()
+            return True
+    except Exception as e:
+        st.error(f"Error deleting record: {str(e)}")
+        return False
+
 def verify_user(username: str, password: str) -> tuple:
     """Verify user credentials across all tables"""
     if not username or not password:
@@ -657,7 +689,11 @@ def personal_details_form(user_id=None):
             exrank = st.selectbox("Rank", ["Select", "PradhanAdhikari", "Pradhan Sahayak Engineer","Uttham_Adhikari","Uttham_Sahayak_Engineer" ,"Adhikari", "Pradhan_Navik", "Uttham_Navik","Uttham_Yantrik","Navik","Yantrik"])
             number = st.text_input("Contact Number", value="")
             branch = st.selectbox("Branch", ["RP", "SA", "AE", "AP","SE"])
-            dob = st.date_input("Date of Birth", value=datetime(1980, 1, 1))
+            # Updated date picker to go back to 1925
+            dob = st.date_input("Date of Birth", 
+                               value=datetime(1980, 1, 1),
+                               min_value=datetime(1925, 1, 1),
+                               max_value=datetime.today())
         
         with col2:
             blood_group = st.selectbox("Blood Group", ["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"])
@@ -753,7 +789,11 @@ def family_details_form(user_id=None):
             spouse_contact_no = st.text_input("Spouse Contact Number", value="")
             address = st.text_area("Address", value="")
             living_city = st.text_input("Current City", value="")
-            spouse_dob = st.date_input("Spouse Date of Birth", value=datetime(1980, 1, 1))
+            # Updated date picker to go back to 1925
+            spouse_dob = st.date_input("Spouse Date of Birth", 
+                                     value=datetime(1980, 1, 1),
+                                     min_value=datetime(1925, 1, 1),
+                                     max_value=datetime.today())
         
         with col2:
             spouse_blood_group = st.selectbox("Spouse Blood Group", ["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"])
@@ -770,7 +810,12 @@ def family_details_form(user_id=None):
             c_col1, c_col2 = st.columns(2)
             with c_col1:
                 child_name = st.text_input(f"Child {i+1} Name", key=f"child_{i}_name")
-                child_dob = st.date_input(f"Child {i+1} DOB", value=datetime(2000, 1, 1), key=f"child_{i}_dob")
+                # Updated date picker to go back to 1925
+                child_dob = st.date_input(f"Child {i+1} DOB", 
+                                        value=datetime(2000, 1, 1), 
+                                        min_value=datetime(1925, 1, 1),
+                                        max_value=datetime.today(),
+                                        key=f"child_{i}_dob")
                 child_qualification = st.text_input(f"Child {i+1} Qualification", key=f"child_{i}_qualification")
             with c_col2:
                 child_married = st.checkbox(f"Is Child {i+1} Married?", key=f"child_{i}_married")
@@ -886,10 +931,13 @@ def family_details_form(user_id=None):
                 
                 st.success("Family details saved successfully!")
                 st.rerun()
-                
+            
             except Exception as e:
                 st.error(f"Error saving family details: {str(e)}")
                 st.error(f"Full error: {traceback.format_exc()}")
+
+
+#---------------------------------------------------------------------------------------
 
 @superadmin_required
 def superadmin_dashboard():
@@ -897,8 +945,8 @@ def superadmin_dashboard():
     
     menu = option_menu(
         menu_title=None,
-        options=["User Management", "View All Data", "Reports"],
-        icons=["people", "database", "bar-chart"],
+        options=["User Management", "View All Data", "Delete Records", "Reports"],
+        icons=["people", "database", "trash", "bar-chart"],
         orientation="horizontal",
         styles={
             "container": {"padding": "0!important", "background-color": "#f8f9fa"},
@@ -960,6 +1008,111 @@ def superadmin_dashboard():
             st.dataframe(df)
         except Exception as e:
             st.error(f"Error loading data: {str(e)}")
+
+    elif menu == "Delete Records":
+        st.subheader("Delete Records")
+        st.warning("⚠️ Use with caution - deleted records cannot be recovered!")
+        
+        tab1, tab2, tab3, tab4 = st.tabs(["Users", "Personal Details", "Family Details", "Documents"])
+        
+        with tab1:
+            st.markdown("### Delete User Records")
+            try:
+                with Session() as session:
+                    users = session.execute(text("SELECT user_id, username, email FROM Users")).fetchall()
+                    if users:
+                        user_options = {f"{user[1]} ({user[2]})": user[0] for user in users}
+                        selected_user = st.selectbox("Select User to Delete", options=list(user_options.keys()))
+                        
+                        if st.button("Delete User", key="delete_user", type="primary", 
+                                   help="This will permanently delete the user and all associated records"):
+                            user_id = user_options[selected_user]
+                            # First delete all associated records
+                            session.execute(text("DELETE FROM Personal_Details WHERE user_id = :user_id"), {'user_id': user_id})
+                            session.execute(text("DELETE FROM Family_Details WHERE user_id = :user_id"), {'user_id': user_id})
+                            session.execute(text("DELETE FROM Documents WHERE user_id = :user_id"), {'user_id': user_id})
+                            # Then delete the user
+                            session.execute(text("DELETE FROM Users WHERE user_id = :user_id"), {'user_id': user_id})
+                            session.commit()
+                            st.success("User and all associated records deleted successfully!")
+                            st.rerun()
+                    else:
+                        st.info("No users found in database")
+            except Exception as e:
+                st.error(f"Error deleting user: {str(e)}")
+        
+        with tab2:
+            st.markdown("### Delete Personal Details Records")
+            try:
+                with Session() as session:
+                    personal_details = session.execute(text("""
+                        SELECT pd.id, u.username, pd.name, pd.asnid 
+                        FROM Personal_Details pd
+                        JOIN Users u ON pd.user_id = u.user_id
+                    """)).fetchall()
+                    if personal_details:
+                        pd_options = {f"{pd[2]} (ASN: {pd[3]}, User: {pd[1]})": pd[0] for pd in personal_details}
+                        selected_pd = st.selectbox("Select Personal Details to Delete", options=list(pd_options.keys()))
+                        
+                        if st.button("Delete Personal Details", key="delete_personal", type="primary"):
+                            pd_id = pd_options[selected_pd]
+                            session.execute(text("DELETE FROM Personal_Details WHERE id = :id"), {'id': pd_id})
+                            session.commit()
+                            st.success("Personal details deleted successfully!")
+                            st.rerun()
+                    else:
+                        st.info("No personal details records found")
+            except Exception as e:
+                st.error(f"Error deleting personal details: {str(e)}")
+        
+        with tab3:
+            st.markdown("### Delete Family Details Records")
+            try:
+                with Session() as session:
+                    family_details = session.execute(text("""
+                        SELECT fd.id, u.username, pd.name, pd.asnid 
+                        FROM Family_Details fd
+                        JOIN Users u ON fd.user_id = u.user_id
+                        JOIN Personal_Details pd ON fd.user_id = pd.user_id
+                    """)).fetchall()
+                    if family_details:
+                        fd_options = {f"Family of {fd[2]} (ASN: {fd[3]}, User: {fd[1]})": fd[0] for fd in family_details}
+                        selected_fd = st.selectbox("Select Family Details to Delete", options=list(fd_options.keys()))
+                        
+                        if st.button("Delete Family Details", key="delete_family", type="primary"):
+                            fd_id = fd_options[selected_fd]
+                            session.execute(text("DELETE FROM Family_Details WHERE id = :id"), {'id': fd_id})
+                            session.commit()
+                            st.success("Family details deleted successfully!")
+                            st.rerun()
+                    else:
+                        st.info("No family details records found")
+            except Exception as e:
+                st.error(f"Error deleting family details: {str(e)}")
+        
+        with tab4:
+            st.markdown("### Delete Document Records")
+            try:
+                with Session() as session:
+                    documents = session.execute(text("""
+                        SELECT d.document_id, u.username, d.document_name, d.particular
+                        FROM Documents d
+                        JOIN Users u ON d.user_id = u.user_id
+                    """)).fetchall()
+                    if documents:
+                        doc_options = {f"{doc[2]} ({doc[3]}) - User: {doc[1]}": doc[0] for doc in documents}
+                        selected_doc = st.selectbox("Select Document to Delete", options=list(doc_options.keys()))
+                        
+                        if st.button("Delete Document", key="delete_document", type="primary"):
+                            doc_id = doc_options[selected_doc]
+                            session.execute(text("DELETE FROM Documents WHERE document_id = :id"), {'id': doc_id})
+                            session.commit()
+                            st.success("Document deleted successfully!")
+                            st.rerun()
+                    else:
+                        st.info("No document records found")
+            except Exception as e:
+                st.error(f"Error deleting document: {str(e)}")
 
     elif menu == "Reports":
         st.subheader("Reports")
@@ -1111,7 +1264,11 @@ def document_management():
                 issued_by = st.text_input("Issued By*", help="Organization/authority that issued this document")
             
             with col2:
-                with_effect_from = st.date_input("With Effect From*", value=datetime.today())
+                # Updated date picker to go back to 1925
+                with_effect_from = st.date_input("With Effect From*", 
+                                               value=datetime.today(),
+                                               min_value=datetime(1925, 1, 1),
+                                               max_value=datetime.today())
                 remarks = st.text_area("Remarks")
             
             uploaded_file = st.file_uploader("Upload PDF Document*", type=["pdf"])
@@ -1236,6 +1393,7 @@ def document_management():
                 st.error(f"Error searching documents: {str(e)}")
         else:
             st.info("Enter search terms to find documents")
+
 # ==============================================
 # ANNUAL SUBSCRIPTION MANAGEMENT
 # ==============================================
@@ -1359,8 +1517,8 @@ def main():
             if st.session_state.role == 'superadmin':
                 menu = option_menu(
                     menu_title=None,
-                    options=["Dashboard", "User Management", "View All Data", "Reports","Documents", "Logout"],
-                    icons=["speedometer2", "people", "database", "bar-chart", "file-earmark", "box-arrow-right"],
+                    options=["Dashboard", "User Management", "View All Data", "Delete Records", "Reports","Documents", "Logout"],
+                    icons=["speedometer2", "people", "database", "trash", "bar-chart", "file-earmark", "box-arrow-right"],
                     menu_icon="cast",
                     default_index=0,
                     styles={
@@ -1405,8 +1563,6 @@ def main():
                 home_page()
             elif menu == "User Management":
                 superadmin_dashboard()
-            elif menu == "Documents":
-                document_management()
             elif menu == "View All Data":
                 st.title("All Veteran Data")
             
@@ -1430,9 +1586,115 @@ def main():
                     st.dataframe(df)
                 except Exception as e:
                     st.error(f"Error loading data: {str(e)}")
+            elif menu == "Delete Records":
+                st.title("Delete Records")
+                st.warning("⚠️ Use with caution - deleted records cannot be recovered!")
+                
+                tab1, tab2, tab3, tab4 = st.tabs(["Users", "Personal Details", "Family Details", "Documents"])
+                
+                with tab1:
+                    st.markdown("### Delete User Records")
+                    try:
+                        with Session() as session:
+                            users = session.execute(text("SELECT user_id, username, email FROM Users")).fetchall()
+                            if users:
+                                user_options = {f"{user[1]} ({user[2]})": user[0] for user in users}
+                                selected_user = st.selectbox("Select User to Delete", options=list(user_options.keys()))
+                                
+                                if st.button("Delete User", key="delete_user_sidebar", type="primary", 
+                                           help="This will permanently delete the user and all associated records"):
+                                    user_id = user_options[selected_user]
+                                    # First delete all associated records
+                                    session.execute(text("DELETE FROM Personal_Details WHERE user_id = :user_id"), {'user_id': user_id})
+                                    session.execute(text("DELETE FROM Family_Details WHERE user_id = :user_id"), {'user_id': user_id})
+                                    session.execute(text("DELETE FROM Documents WHERE user_id = :user_id"), {'user_id': user_id})
+                                    # Then delete the user
+                                    session.execute(text("DELETE FROM Users WHERE user_id = :user_id"), {'user_id': user_id})
+                                    session.commit()
+                                    st.success("User and all associated records deleted successfully!")
+                                    st.rerun()
+                            else:
+                                st.info("No users found in database")
+                    except Exception as e:
+                        st.error(f"Error deleting user: {str(e)}")
+                
+                with tab2:
+                    st.markdown("### Delete Personal Details Records")
+                    try:
+                        with Session() as session:
+                            personal_details = session.execute(text("""
+                                SELECT pd.id, u.username, pd.name, pd.asnid 
+                                FROM Personal_Details pd
+                                JOIN Users u ON pd.user_id = u.user_id
+                            """)).fetchall()
+                            if personal_details:
+                                pd_options = {f"{pd[2]} (ASN: {pd[3]}, User: {pd[1]})": pd[0] for pd in personal_details}
+                                selected_pd = st.selectbox("Select Personal Details to Delete", options=list(pd_options.keys()))
+                                
+                                if st.button("Delete Personal Details", key="delete_personal_sidebar", type="primary"):
+                                    pd_id = pd_options[selected_pd]
+                                    session.execute(text("DELETE FROM Personal_Details WHERE id = :id"), {'id': pd_id})
+                                    session.commit()
+                                    st.success("Personal details deleted successfully!")
+                                    st.rerun()
+                            else:
+                                st.info("No personal details records found")
+                    except Exception as e:
+                        st.error(f"Error deleting personal details: {str(e)}")
+                
+                with tab3:
+                    st.markdown("### Delete Family Details Records")
+                    try:
+                        with Session() as session:
+                            family_details = session.execute(text("""
+                                SELECT fd.id, u.username, pd.name, pd.asnid 
+                                FROM Family_Details fd
+                                JOIN Users u ON fd.user_id = u.user_id
+                                JOIN Personal_Details pd ON fd.user_id = pd.user_id
+                            """)).fetchall()
+                            if family_details:
+                                fd_options = {f"Family of {fd[2]} (ASN: {fd[3]}, User: {fd[1]})": fd[0] for fd in family_details}
+                                selected_fd = st.selectbox("Select Family Details to Delete", options=list(fd_options.keys()))
+                                
+                                if st.button("Delete Family Details", key="delete_family_sidebar", type="primary"):
+                                    fd_id = fd_options[selected_fd]
+                                    session.execute(text("DELETE FROM Family_Details WHERE id = :id"), {'id': fd_id})
+                                    session.commit()
+                                    st.success("Family details deleted successfully!")
+                                    st.rerun()
+                            else:
+                                st.info("No family details records found")
+                    except Exception as e:
+                        st.error(f"Error deleting family details: {str(e)}")
+                
+                with tab4:
+                    st.markdown("### Delete Document Records")
+                    try:
+                        with Session() as session:
+                            documents = session.execute(text("""
+                                SELECT d.document_id, u.username, d.document_name, d.particular
+                                FROM Documents d
+                                JOIN Users u ON d.user_id = u.user_id
+                            """)).fetchall()
+                            if documents:
+                                doc_options = {f"{doc[2]} ({doc[3]}) - User: {doc[1]}": doc[0] for doc in documents}
+                                selected_doc = st.selectbox("Select Document to Delete", options=list(doc_options.keys()))
+                                
+                                if st.button("Delete Document", key="delete_document_sidebar", type="primary"):
+                                    doc_id = doc_options[selected_doc]
+                                    session.execute(text("DELETE FROM Documents WHERE document_id = :id"), {'id': doc_id})
+                                    session.commit()
+                                    st.success("Document deleted successfully!")
+                                    st.rerun()
+                            else:
+                                st.info("No document records found")
+                    except Exception as e:
+                        st.error(f"Error deleting document: {str(e)}")
             elif menu == "Reports":
                 st.title("Reports")
                 st.write("Reporting functionality will be implemented here")
+            elif menu == "Documents":
+                document_management()
             elif menu == "Logout":
                 logout_button()
         elif st.session_state.role == 'stateadmin':
@@ -1466,5 +1728,6 @@ def main():
                 subscription_management()
             elif menu == "Logout":
                 logout_button()
+
 if __name__ == "__main__":
     main()
