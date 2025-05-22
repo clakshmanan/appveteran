@@ -1,4 +1,4 @@
-
+# 22 May _2025 Update
 import streamlit as st
 from streamlit_option_menu import option_menu
 import sqlite3  # Changed from mysql.connector
@@ -567,9 +567,13 @@ initialize_first_superadmin()
 def login_form():
     """Login form with validation"""
     with st.sidebar:
+        col1,col2,col3 = st.columns(3)
+        with col2:
+            st.image("C:/clak/_deployment/veteran/icgvwa_logo.jpg",width=150)
+         
         st.markdown("""
         <div class="logo">
-            <h1>Veteran Menu</h1>
+            <h1>ICGVWA WELCOMES</h1>
         </div>
         """, unsafe_allow_html=True)
     
@@ -578,7 +582,7 @@ def login_form():
         with st.container():
             st.markdown("""
             <div style="text-align: center; margin-bottom: 30px;">
-                <h1 style="color: #1e40af;">Welcome to ICGVWA</h1>
+                <h1 style="color: #1e40af;">VETERAN LOGIN</h1>
                 <p style="color: #1e40af">Please login to access your account</p>
             </div>
             """, unsafe_allow_html=True)
@@ -624,10 +628,14 @@ def home_page():
             <h3>Welcome to the Veteran Database Management System</h3>
             <p>This portal provides comprehensive services for veterans including:</p>
             <ul>
-                <li>📝 Veteran record management</li>
-                <li>🏛️ State-wise administration</li>
-                <li>💼 Job seeking portal</li>
-                <li>💑 Matrimonial services</li>
+                <li>🏛️  State-wise administration</li>
+                <li>👮‍♂️  Veteran Personal Details</li>
+                <li>👩  Veteran Family Details</li>
+                <li>👷🏿‍♀️  Veteran Chidren's Info</li>
+                <li>📌  Subscription Details</li>
+                <li>📕  Documents(in PDF) Uploading / viewing / doanloading</li>
+                <li>💼  Job seeking portal</li>
+                <li>💑  Matrimonial services</li>
             </ul>
         </div>
         """, unsafe_allow_html=True)
